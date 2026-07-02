@@ -34,7 +34,7 @@ export const RATES = {
   laborPerJoint: 14,                // drill/tap/fit cold connection
   laborPerLfMullion: 3.5,           // miter, fit, fasten
   finishMultiplier: { 'raw': 1.0, 'matte-black': 1.12, 'oil-rubbed-bronze': 1.22, 'brass-patina': 1.35 },
-  doorLeafBase: { glassGrid: 850, solid: 700 },   // fabrication base per leaf
+  doorLeafBase: { glassGrid: 550, solid: 700 },   // welded frame fab per leaf (glazing counted separately)
   wasteFactor: 1.10,
   stockLengthFt: 24,                // mill length for tube/angle stock
 };
@@ -493,12 +493,58 @@ export function generate(cfgIn) {
     if (d.style === 'glass-grid' && railsLocal.length === 0 && railY.length)
       notes.push('No partition rail line falls within the door leaf — leaves generate as full-height lites.');
     for (let leaf = 0; leaf < d._leaves; leaf++) {
+      const hand = leaf === 0 ? 'L' : 'R';
       const lx = leaf === 0 ? x0 + d.hingeGap : x0 + span - d.hingeGap - d._leafW;
+      const cx = lx + d._leafW / 2, cy = d.floorClearance + d._leafH / 2;
+      const pivot = [hand === 'L' ? lx : lx + d._leafW, cy, 0];
+      const openSign = hand === 'L' ? -1 : 1;
+      const dp = p => ({ ...p, doorPivot: pivot, openSign });   // parts that swing with this leaf
+      // welded frame: stiles + rails only — glazing and hardware are separate components
       P.add({
-        kind: 'door', profile: 'door', name: `Door leaf ${inch(d._leafW)} × ${inch(d._leafH)} (${d.style}, ${railsLocal.length + 1} lite${railsLocal.length ? 's, rails aligned to grid' : ''})`,
+        kind: 'door', profile: 'door', name: `Door leaf frame ${inch(d._leafW)} × ${inch(d._leafH)} — welded (${d.style}${railsLocal.length ? ', rails on grid' : ''}, ${hand})`,
         length: d._leafH, dims: [d._leafW, d._leafH, 1.75], holes: [],
-        extra: { style: d.style, rails: railsLocal, hinge: d.hinge, hand: leaf === 0 ? 'L' : 'R', frame: leafFrame, pull: d.pull },
-      }, { pos: [lx + d._leafW / 2, d.floorClearance + d._leafH / 2, 0], rot: [0, 0, 0], door: true, hand: leaf === 0 ? 'L' : 'R' });
+        extra: { style: d.style, rails: railsLocal, hinge: d.hinge, hand, frame: leafFrame },
+      }, dp({ pos: [cx, cy, 0], door: true, hand }));
+      // glazing per lite: glass pane + mitered angle frames both faces (same S4 stock)
+      if (d.style === 'glass-grid') {
+        const f = leafFrame;
+        const innerW = d._leafW - 2 * f;
+        const railsC = railsLocal.map(r => r - d._leafH / 2).sort((a, b) => a - b);
+        const cuts = [-d._leafH / 2 + f * 1.6];
+        for (const rr of railsC) cuts.push(rr - f / 2, rr + f / 2);
+        cuts.push(d._leafH / 2 - f);
+        for (let i = 0; i < cuts.length; i += 2) {
+          const liteH = cuts[i + 1] - cuts[i];
+          if (liteH <= 0.5) continue;
+          const zoneB = cy + cuts[i], zoneT = cy + cuts[i + 1], zoneC = (zoneB + zoneT) / 2;
+          const gw = innerW - 2 * S.glassEdgeClear, gh = liteH - 2 * S.glassEdgeClear;
+          glassArea += sqft(gw, gh);
+          panes.push({ bay: doorBay + 1, row: `door lite`, w: gw, h: gh });
+          P.add({ kind: 'glass', profile: 'glass', name: `Door lite ¼" (${cfg.glass.type})`, length: gw, dims: [gw, gh, S.glassT], holes: [] },
+            dp({ pos: [cx, zoneC, 0] }));
+          for (const face of [1, -1]) {
+            const zc = face * (S.glassT / 2 + S.mullT / 2);
+            P.add({ kind: 'angle', profile: 'mullion', name: 'Door glazing angle — horizontal (mitered)', length: innerW, miter: 45, holes: [] },
+              dp({ pos: [cx, zoneB + S.mullLeg / 2, zc], mullion: 'h-bottom', face }));
+            P.add({ kind: 'angle', profile: 'mullion', name: 'Door glazing angle — horizontal (mitered)', length: innerW, miter: 45, holes: [] },
+              dp({ pos: [cx, zoneT - S.mullLeg / 2, zc], mullion: 'h-top', face }));
+            P.add({ kind: 'angle', profile: 'mullion', name: 'Door glazing angle — vertical (mitered)', length: liteH, miter: 45, holes: [] },
+              dp({ pos: [cx - innerW / 2 + S.mullLeg / 2, zoneC, zc], mullion: 'v-left', face }));
+            P.add({ kind: 'angle', profile: 'mullion', name: 'Door glazing angle — vertical (mitered)', length: liteH, miter: 45, holes: [] },
+              dp({ pos: [cx + innerW / 2 - S.mullLeg / 2, zoneC, zc], mullion: 'v-right', face }));
+          }
+        }
+      }
+      // pulls: separate brass components, mounted back-to-back
+      if (d.pull && d.pull !== 'none') {
+        const nominal = d.pull === 'brass72' ? 72 : 36;
+        const pullL = Math.min(nominal, d._leafH - 8);
+        const px = cx + (hand === 'L' ? d._leafW / 2 - 3 : -d._leafW / 2 + 3);
+        for (const zs of [1, -1]) {
+          P.add({ kind: 'pull', profile: 'pull', name: `Brass pull ${nominal}" × Ø1"`, length: pullL, dims: [1.0, pullL, 1.0], holes: [] },
+            dp({ pos: [px, cy, zs * (1.75 / 2 + 1.25)] }));
+        }
+      }
       doorParts.push({ leaf, hinges: d.hinge === 'continuous' ? 1 : Math.max(3, Math.ceil(d._leafH / 30)) });
     }
     // transom above door head if space

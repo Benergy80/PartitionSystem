@@ -136,52 +136,32 @@ export function miteredAngleGeometry(L, leg, t) {
   return g;
 }
 
-// ---- door leaf -----------------------------------------------------------------
+// ---- door leaf frame (welded stiles + rails; glazing/hardware are separate parts) ----
 export function doorLeafGroup(part, mats) {
   const { dims, extra } = part;
   const [w, h, d] = dims;
   const f = extra.frame ?? 1.75;
   const grp = new THREE.Group();
-  const steel = mats.steel, glass = mats.glass;
+  const steel = mats.steel;
   const bar = (bw, bh, bd) => new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), steel);
-  // stiles
   const ls = bar(f, h, d); ls.position.set(-w / 2 + f / 2, 0, 0); grp.add(ls);
   const rs = bar(f, h, d); rs.position.set(w / 2 - f / 2, 0, 0); grp.add(rs);
-  // top/bottom rails
   const tr = bar(w - 2 * f, f, d); tr.position.set(0, h / 2 - f / 2, 0); grp.add(tr);
   const br = bar(w - 2 * f, f * 1.6, d); br.position.set(0, -h / 2 + f * 0.8, 0); grp.add(br);
   if (extra.style === 'solid') {
     const p = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * f, h - f - f * 1.6, d * 0.6), mats.wood || steel);
-    p.position.set(0, (f * 1.6 - f) / 2 * -1 + (f * 1.6 - f) / 2, 0); grp.add(p);
+    grp.add(p);
   } else {
-    // mid-rails sit exactly on the partition rail centerlines (extra.rails = y from leaf bottom)
-    const innerW = w - 2 * f;
-    const rails = (extra.rails || []).map(r => r - h / 2).sort((a, b) => a - b); // leaf-local centered y
-    const cuts = [-h / 2 + f * 1.6];
-    for (const r of rails) { cuts.push(r - f / 2, r + f / 2); }
-    cuts.push(h / 2 - f);
-    for (let i = 0; i < cuts.length; i += 2) {
-      const liteH = cuts[i + 1] - cuts[i];
-      if (liteH <= 0.5) continue;
-      const gp = new THREE.Mesh(new THREE.BoxGeometry(innerW, liteH, SYS.glassT), glass);
-      gp.position.set(0, (cuts[i] + cuts[i + 1]) / 2, 0); grp.add(gp);
-    }
-    for (const r of rails) { const mr = bar(innerW, f, d); mr.position.set(0, r, 0); grp.add(mr); }
+    const rails = (extra.rails || []).map(r => r - h / 2);
+    for (const r of rails) { const mr = bar(w - 2 * f, f, d); mr.position.set(0, r, 0); grp.add(mr); }
   }
-  // pull
-  if (extra.pull !== 'none') {
-    const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, Math.min(72, h * 0.72), 16), mats.brass);
-    const px = extra.hand === 'L' ? w / 2 - 3 : -w / 2 + 3;
-    pl.position.set(px, 0, d / 2 + 1.25); grp.add(pl);
-    const pl2 = pl.clone(); pl2.position.z = -d / 2 - 1.25; grp.add(pl2);
-  }
-  // hinges
-  const hingeN = extra.hinge === 'continuous' ? 1 : Math.max(3, Math.ceil(h / 30));
+  // hinges (hardware, shown on the frame)
   const hx = extra.hand === 'L' ? -w / 2 : w / 2;
   if (extra.hinge === 'continuous') {
     const hg = new THREE.Mesh(new THREE.BoxGeometry(0.5, h * 0.95, 0.75), mats.brass);
     hg.position.set(hx, 0, 0); grp.add(hg);
   } else {
+    const hingeN = Math.max(3, Math.ceil(h / 30));
     for (let i = 0; i < hingeN; i++) {
       const hg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.5, 0.9), mats.brass);
       hg.position.set(hx, -h / 2 + 6 + i * ((h - 12) / Math.max(1, hingeN - 1)), 0); grp.add(hg);
@@ -225,6 +205,10 @@ export function buildPartMesh(part, mats) {
     case 'portal': {
       const [w, h, d] = part.dims;
       obj = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats.portal);
+      break;
+    }
+    case 'pull': {
+      obj = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, part.length, 20), mats.brass);
       break;
     }
     case 'door':

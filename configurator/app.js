@@ -132,31 +132,35 @@ function rebuildScene() {
   viewer.root = new THREE.Group();
   viewer.instances = [];
   viewer.doorPivots = [];
-  const center = new THREE.Vector3(cfg.opening.width / 2, cfg.opening.height / 2, 0);
+  const pivotMap = new Map();
   for (const part of result.parts) {
     for (const pose of part.poses) {
       const obj = buildPartMesh(part, viewer.mats);
       poseObject(obj, pose);
-      let node = obj;
-      if (pose.door) {
-        // hinge pivot at the hinge stile edge so leaves swing like the real thing
-        const hand = part.extra.hand, w = part.dims[0];
-        const pivot = new THREE.Group();
-        pivot.position.set(pose.pos[0] + (hand === 'L' ? -w / 2 : w / 2), pose.pos[1], pose.pos[2]);
-        obj.position.set(hand === 'L' ? w / 2 : -w / 2, 0, 0);
+      if (pose.doorPivot) {
+        // every door-attached part (frame, lites, glazing angles, pulls) joins its leaf's hinge pivot
+        const key = pose.doorPivot.join(',');
+        let pivot = pivotMap.get(key);
+        if (!pivot) {
+          pivot = new THREE.Group();
+          pivot.position.set(...pose.doorPivot);
+          pivot.userData.openSign = pose.openSign;
+          pivotMap.set(key, pivot);
+          viewer.doorPivots.push(pivot);
+          viewer.root.add(pivot);
+        }
+        obj.position.set(pose.pos[0] - pivot.position.x, pose.pos[1] - pivot.position.y, pose.pos[2] - pivot.position.z);
         pivot.add(obj);
-        pivot.userData.openSign = hand === 'L' ? -1 : 1;   // both leaves swing toward viewer (+Z)
-        viewer.doorPivots.push(pivot);
-        node = pivot;
+      } else {
+        viewer.root.add(obj);
       }
-      node.userData.partId = part.id;
-      node.userData.kind = part.kind;
-      node.userData.profile = part.profile;
-      node.userData.pose = pose;
-      node.userData.basePos = node.position.clone();
-      if (part.kind === 'glass') node.visible = showGlass;
-      viewer.root.add(node);
-      viewer.instances.push(node);
+      obj.userData.partId = part.id;
+      obj.userData.kind = part.kind;
+      obj.userData.profile = part.profile;
+      obj.userData.pose = pose;
+      obj.userData.basePos = obj.position.clone();
+      if (part.kind === 'glass') obj.visible = showGlass;
+      viewer.instances.push(obj);
     }
   }
   viewer.scene.add(viewer.root);
@@ -182,6 +186,7 @@ function explodeVector(o) {
   if (kind === 'angle') return new THREE.Vector3(0, 0, (pose.face ?? 1) * 1.0);
   if (kind === 'glass' || kind === 'panel') return new THREE.Vector3(0, 0, 0.28);
   if (kind === 'door') return new THREE.Vector3(0, 0, 0.75);
+  if (kind === 'pull') return new THREE.Vector3(0, 0, 1.35);
   return new THREE.Vector3(0, 0, 0.4);
 }
 function applyExplode() {
@@ -610,6 +615,9 @@ function cutSheetHTML() {
   <h2>Hole schedule</h2>
   <table><tr><th>Part</th><th>#</th><th>Face</th><th>X from end</th><th>Y from edge</th><th>Ø</th><th>Op</th></tr>
   ${cutParts.flatMap(p => (p.holes || []).map((h, i) => `<tr><td>${p.id} (×${p.qty})</td><td>${i + 1}</td><td>${h.face}</td><td>${inch(h.x)}</td><td>${inch(h.y)}</td><td>${inch(h.d)}</td><td>${h.tap ? 'tap ' + h.tap : (h.note || 'drill')}</td></tr>`)).join('')}</table>
+  ${result.parts.some(p => p.kind === 'pull') ? `<h2>Hardware</h2>
+  <table><tr><th>ID</th><th>Item</th><th>Qty</th><th>Length</th></tr>
+  ${result.parts.filter(p => p.kind === 'pull').map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.qty}</td><td>${fmtFtIn(p.length)}</td></tr>`).join('')}</table>` : ''}
   <h2>Glass / panel schedule</h2>
   <table><tr><th>ID</th><th>Type</th><th>Qty</th><th>W × H</th><th>Area ea.</th></tr>
   ${glassParts.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.qty}</td><td>${inch(p.dims[0])} × ${inch(p.dims[1])}</td><td>${(p.dims[0] * p.dims[1] / 144).toFixed(1)} sqft</td></tr>`).join('')}</table>
