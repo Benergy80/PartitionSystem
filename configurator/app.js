@@ -687,6 +687,7 @@ $$('#btnSwing').onclick = () => {
 $$('#btnTheme').onclick = () => { lightMode = !lightMode; applyTheme(); };
 
 // ---------------- boot ----------------
+window.__app = { viewer, get result() { return result; }, get cfg() { return cfg; } };
 initViewer();
 regen();
 frameCamera(true);

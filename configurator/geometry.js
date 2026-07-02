@@ -240,6 +240,8 @@ export function buildPartMesh(part, mats) {
 // orient a part instance from its pose (see engine placements)
 export function poseObject(obj, pose) {
   if (pose.vertical) obj.rotation.z = Math.PI / 2;      // tube length X -> Y
+  if (pose.flat) obj.rotation.x = -Math.PI / 2;         // plate lies horizontal (thickness vertical)
+  if (pose.tab) obj.rotation.y = Math.PI / 2;           // tab plane perpendicular to wall
   if (pose.mullion === 'v-left' || pose.mullion === 'v-right') obj.rotation.z = pose.mullion === 'v-left' ? -Math.PI / 2 : Math.PI / 2;
   if (pose.mullion === 'h-top') obj.rotation.z = Math.PI;
   if (pose.mullion && pose.face === -1) obj.rotation.y = Math.PI;

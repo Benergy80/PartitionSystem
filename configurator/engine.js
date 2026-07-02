@@ -9,8 +9,8 @@
 // ---- Stock library (measured from STP files) -------------------------------
 export const STOCK = {
   header:      { key: 'header',      name: 'Header tube 2×5',            w: 2.0,  h: 5.0,  wall: 0.125, cornerR: 0.25,   pricePerLf: 42 },
-  vertical:    { key: 'vertical',    name: 'Vertical HSS 1×3',           w: 1.0,  h: 3.0,  wall: 0.125, cornerR: 0.125,  pricePerLf: 24 },
-  horizontal:  { key: 'horizontal',  name: 'Horizontal tube 1×2.5',      w: 1.0,  h: 2.5,  wall: 0.125, cornerR: 0.0,    pricePerLf: 21 },
+  vertical:    { key: 'vertical',    name: 'Vertical HSS 1×3 (14 ga)',   w: 1.0,  h: 3.0,  wall: 0.083, cornerR: 0.125,  pricePerLf: 24 },
+  horizontal:  { key: 'horizontal',  name: 'Horizontal tube 1×2.5 (14 ga)', w: 1.0, h: 2.5, wall: 0.083, cornerR: 0.0,   pricePerLf: 21 },
   mullion:     { key: 'mullion',     name: 'Mullion angle ¾×¾×⅛',        leg: 0.75, t: 0.125,                            pricePerLf: 9  },
 };
 
@@ -20,7 +20,7 @@ export const PLATE = {
   shearB:      { key: 'shearB',   name: 'Shear block B (terminal) 2×2×¼', L: 2.0,  W: 2.0, t: 0.25,   cornerR: 0.125, priceEach: 4.0 },
   tClip:       { key: 'tClip',    name: 'T clip base 6.5×2×3/16',         L: 6.5,  W: 2.0, t: 0.1875, cornerR: 0.125, priceEach: 11.0 },
   fClip:       { key: 'fClip',    name: 'F clip base 3.67×2×3/16',        L: 3.67, W: 2.0, t: 0.1875, cornerR: 0.125, priceEach: 9.0 },
-  clipTab:     { key: 'clipTab',  name: 'F&T clip tab 3/16 bar',          L: 3.25, W: 2.83, t: 0.1875, cornerR: 0.0,  priceEach: 3.0 },
+  clipTab:     { key: 'clipTab',  name: 'F&T clip tab 3/16×1¼ bar',       L: 3.25, W: 1.25, t: 0.1875, cornerR: 0.0,  priceEach: 3.0 },
 };
 
 export const RATES = {
@@ -353,14 +353,14 @@ export function generate(cfgIn) {
       kind: 'plate', profile: clip.key, name: clip.name,
       length: clip.L, dims: [clip.L, clip.W, clip.t],
       holes: anchorXs.map(ax => ({ face: 'top', x: clip.L / 2 + ax, y: clip.W / 2, d: S.anchorHole, note: 'floor anchor' })),
-    }, { pos: [x, clip.t / 2, 0], rot: [0, 0, 0] });
+    }, { pos: [x, clip.t / 2, 0], flat: true });
     fasteners.anchors += 2;
     // two tabs per clip
     for (let t = 0; t < 2; t++) {
       P.add({
         kind: 'plate', profile: 'clipTab', name: PLATE.clipTab.name,
         length: PLATE.clipTab.L, dims: [PLATE.clipTab.W, PLATE.clipTab.L, PLATE.clipTab.t], holes: [],
-      }, { pos: [x + (t ? 0.415 : -0.415), S.clipPlateT + PLATE.clipTab.L / 2, 0], rot: [0, 0, 0] });
+      }, { pos: [x + (t ? 0.321 : -0.321), S.clipPlateT + PLATE.clipTab.L / 2, 0], tab: true });
     }
     // top clip: screws to header underside (header mode) or anchors to structure above
     const topClipY = headerMode ? gridTop - clip.t / 2 : H - clip.t / 2;
@@ -368,13 +368,13 @@ export function generate(cfgIn) {
       kind: 'plate', profile: clip.key, name: clip.name,
       length: clip.L, dims: [clip.L, clip.W, clip.t],
       holes: anchorXs.map(ax => ({ face: 'top', x: clip.L / 2 + ax, y: clip.W / 2, d: S.anchorHole, note: headerMode ? 'header screw' : 'structure anchor' })),
-    }, { pos: [x, topClipY, 0], rot: [0, 0, 0] });
+    }, { pos: [x, topClipY, 0], flat: true });
     if (headerMode) fasteners.screw832 += 2; else fasteners.anchors += 2;
     for (let t = 0; t < 2; t++) {
       P.add({
         kind: 'plate', profile: 'clipTab', name: PLATE.clipTab.name,
         length: PLATE.clipTab.L, dims: [PLATE.clipTab.W, PLATE.clipTab.L, PLATE.clipTab.t], holes: [],
-      }, { pos: [x + (t ? 0.415 : -0.415), topClipY - clip.t / 2 - PLATE.clipTab.L / 2, 0], rot: [0, 0, 0] });
+      }, { pos: [x + (t ? 0.321 : -0.321), topClipY - clip.t / 2 - PLATE.clipTab.L / 2, 0], tab: true });
     }
   });
 
@@ -428,13 +428,13 @@ export function generate(cfgIn) {
         P.add({
           kind: 'plate', profile: p.key, name: p.name, length: p.L, dims: [p.L, p.W, p.t],
           holes: [0.5, 1.5, 3.5, 4.5].map(hx => ({ face: 'top', x: hx, y: 0.5, d: S.tapDrill, tap: '8-32', note: '8-32 tap' })),
-        }, { pos: [x, ry, 0], rot: [0, 0, 0] });
+        }, { pos: [x, ry, 0], flat: true });
       } else {
         const p = PLATE.shearB;
         P.add({
           kind: 'plate', profile: p.key, name: p.name, length: p.L, dims: [p.L, p.W, p.t],
           holes: [0.5, 1.5].map(hx => ({ face: 'top', x: hx, y: 0.5, d: S.tapDrill, tap: '8-32', note: '8-32 tap' })),
-        }, { pos: [x + (leftOpen ? -0.5 : 0.5), ry, 0], rot: [0, 0, 0] });
+        }, { pos: [x + (leftOpen ? -0.5 : 0.5), ry, 0], flat: true });
       }
     });
   });

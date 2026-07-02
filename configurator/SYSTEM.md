@@ -8,8 +8,8 @@ and the STP part files in `ELEVATOR ENTRY SHOP AND STP FILES/`. All dimensions i
 | # | Profile / plate | Section | Notes |
 |---|-----------------|---------|-------|
 | S1 | Header tube | 2" × 5", ¼" corner radius, ⅛" wall | Type A ends 83.09" ×2, Type B center jamb 73.57" ×1 |
-| S2 | Vertical support | HSS 1" × 3", ⅛" corner radius, ⅛" wall | 99.25" long ×8 (A and B differ by hole pattern only) |
-| S3 | Horizontal support | tube 1" × 2.5", ⅛" wall | 26.447" ×24 (= clear span between verticals) |
+| S2 | Vertical support | HSS 1" × 3", ⅛" corner radius, 14-ga (0.083") wall | 99.25" long ×8 (A and B differ by hole pattern only) |
+| S3 | Horizontal support | tube 1" × 2.5", 14-ga (0.083") wall | 26.447" ×24 (= clear span between verticals) |
 | S4 | Mullion angle | ¾" × ¾" × ⅛" steel angle, 45° mitered ends | H 26.447" ×72, V 31.75" ×72 |
 | S5 | Glass | ¼" plate (GL-01 boardroom / GL-02 lobby) | sized per pane − glazing clearance |
 | S6 | Shear block A | 5" × 2" × ¼" flat bar | 4× 8-32 taps (Ø0.137 tap drill) @ ½" & 1½" from each end, ½" from long edge; ⅛" corner fillets |
@@ -17,7 +17,7 @@ and the STP part files in `ELEVATOR ENTRY SHOP AND STP FILES/`. All dimensions i
 | S7 | Shear block B (terminal) | 2" × 2" × ¼" | 2× 8-32 taps @ ½" & 1½", ½" from edge |
 | S8 | T clip base | 6.5" × 2" × 3/16" | 2× Ø5/16" anchor holes @ 5" o.c.; twin 3/16" × 3.25" tab bars 0.83" apart |
 | S9 | F clip base | 3.67" × 2" × 3/16" | 2× Ø5/16" holes @ 1" o.c. offset (wall/end condition) |
-| S10 | F&T clip tab | 3/16" bar, ~2.83" × 3.25" | ×32, weld/slot into clip bases, engage passthrough blocks |
+| S10 | F&T clip tab | 3/16" × 1¼" bar, 3.25" tall, in pairs 13/16" outer spread | ×32, pass through S6p slot into the vertical cavity (14-ga wall → 0.834" clear = slip fit) |
 | S11 | Portal surround | ½" steel plate, bronze finish | ¼" reveal beyond brick both sides; depth per survey (13¼" here) |
 | F1 | Fastener | 8-32 × ⅜" stainless FH | all shear-block connections |
 | F2 | Anchor | Ø¼" (5/16" clearance) | clip bases to floor / header |
