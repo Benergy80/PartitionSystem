@@ -295,9 +295,9 @@ export function generate(cfgIn) {
       if (x >= seg.x0 - 1e-6 && x <= seg.x0 + seg.L + 1e-6) {
         const lx = Math.min(Math.max(x - seg.x0, 1.0), seg.L - 1.0);
         const isEnd = (x === vx[0] || x === vx[vx.length - 1]);
-        const half = isEnd ? 0.5 : 2.5;   // F-clip 1" o.c., T-clip 5" o.c.
-        holes.push({ face: 'bottom', x: lx - half, y: S.headerD / 2, d: 0.1875, note: 'clip pilot' });
-        holes.push({ face: 'bottom', x: lx + half, y: S.headerD / 2, d: 0.1875, note: 'clip pilot' });
+        const dir = x === vx[0] ? 1 : -1;
+        const pilotXs = isEnd ? [lx + dir * 0.935, lx + dir * 1.935] : [lx - 2.5, lx + 2.5]; // F foot / T symmetric
+        pilotXs.forEach(px => holes.push({ face: 'bottom', x: px, y: S.headerD / 2, d: 0.1875, note: 'clip pilot' }));
         fasteners.screw832 += 2;
       }
     });
@@ -346,36 +346,33 @@ export function generate(cfgIn) {
       kind: 'tube', profile: 'vertical', name: isJamb ? 'Vertical support (door jamb)' : isEnd ? 'Vertical support (end)' : 'Vertical support (mid)',
       length: vertLen, dims: [S.vertD, S.vertW], holes, slots, extra: isJamb ? 'jamb' : isEnd ? 'end' : 'mid',
     }, { pos: [x, vertY0 + vertLen / 2, 0], rot: [0, 0, 0], vertical: true });
-    // clips at base
-    const clip = isEnd ? PLATE.fClip : PLATE.tClip;
-    const anchorXs = isEnd ? [-0.5, 0.5] : [-2.5, 2.5];
-    P.add({
-      kind: 'plate', profile: clip.key, name: clip.name,
-      length: clip.L, dims: [clip.L, clip.W, clip.t],
-      holes: anchorXs.map(ax => ({ face: 'top', x: clip.L / 2 + ax, y: clip.W / 2, d: S.anchorHole, note: 'floor anchor' })),
-    }, { pos: [x, clip.t / 2, 0], flat: true });
+    // ---- clips ----
+    // F clips (one-sided foot): all four outer corners, and the BOTTOM of door jambs
+    // with the foot turned away from the door swing. T clips (symmetric): everywhere else.
+    const addClip = (cy, useF, dir, note) => {
+      const clip = useF ? PLATE.fClip : PLATE.tClip;
+      // F baseline: tabs 0.6" from the near (vertical-side) end, anchors on the foot 1" o.c.
+      const holeXs = useF ? [clip.L / 2 + 0.335, clip.L / 2 + 1.335] : [clip.L / 2 - 2.5, clip.L / 2 + 2.5];
+      P.add({
+        kind: 'plate', profile: clip.key, name: clip.name,
+        length: clip.L, dims: [clip.L, clip.W, clip.t],
+        holes: holeXs.map(hx => ({ face: 'top', x: hx, y: clip.W / 2, d: S.anchorHole, note })),
+      }, { pos: [x + (useF ? dir * (clip.L / 2 - 0.6) : 0), cy, 0], flat: true, flip: useF && dir < 0 });
+      for (let t = 0; t < 2; t++) {
+        P.add({
+          kind: 'plate', profile: 'clipTab', name: PLATE.clipTab.name,
+          length: PLATE.clipTab.L, dims: [PLATE.clipTab.W, PLATE.clipTab.L, PLATE.clipTab.t], holes: [],
+        }, { pos: [x + (t ? 0.321 : -0.321), cy > H / 2 ? cy - S.clipPlateT / 2 - PLATE.clipTab.L / 2 : cy + S.clipPlateT / 2 + PLATE.clipTab.L / 2, 0], tab: true });
+      }
+    };
+    const dirEnd = vi === 0 ? 1 : -1;                       // end feet turn into the elevation
+    const bottomF = isEnd || isJamb;
+    const bottomDir = isEnd ? dirEnd : (vi === doorBay ? -1 : 1);  // jamb feet turn away from the door
+    addClip(S.clipPlateT / 2, bottomF, bottomDir, 'floor anchor');
     fasteners.anchors += 2;
-    // two tabs per clip
-    for (let t = 0; t < 2; t++) {
-      P.add({
-        kind: 'plate', profile: 'clipTab', name: PLATE.clipTab.name,
-        length: PLATE.clipTab.L, dims: [PLATE.clipTab.W, PLATE.clipTab.L, PLATE.clipTab.t], holes: [],
-      }, { pos: [x + (t ? 0.321 : -0.321), S.clipPlateT + PLATE.clipTab.L / 2, 0], tab: true });
-    }
-    // top clip: screws to header underside (header mode) or anchors to structure above
-    const topClipY = headerMode ? gridTop - clip.t / 2 : H - clip.t / 2;
-    P.add({
-      kind: 'plate', profile: clip.key, name: clip.name,
-      length: clip.L, dims: [clip.L, clip.W, clip.t],
-      holes: anchorXs.map(ax => ({ face: 'top', x: clip.L / 2 + ax, y: clip.W / 2, d: S.anchorHole, note: headerMode ? 'header screw' : 'structure anchor' })),
-    }, { pos: [x, topClipY, 0], flat: true });
+    const topClipY = headerMode ? gridTop - S.clipPlateT / 2 : H - S.clipPlateT / 2;
+    addClip(topClipY, isEnd, dirEnd, headerMode ? 'header screw' : 'structure anchor');
     if (headerMode) fasteners.screw832 += 2; else fasteners.anchors += 2;
-    for (let t = 0; t < 2; t++) {
-      P.add({
-        kind: 'plate', profile: 'clipTab', name: PLATE.clipTab.name,
-        length: PLATE.clipTab.L, dims: [PLATE.clipTab.W, PLATE.clipTab.L, PLATE.clipTab.t], holes: [],
-      }, { pos: [x + (t ? 0.321 : -0.321), topClipY - clip.t / 2 - PLATE.clipTab.L / 2, 0], tab: true });
-    }
   });
 
   // ---- base sill channels: floor line of the grid, anchored to slab ----
