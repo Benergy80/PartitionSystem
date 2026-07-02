@@ -23,6 +23,9 @@
   #viewerHud { position: absolute; top: 10px; left: 12px; display: flex; gap: 8px; z-index: 5; flex-wrap: wrap; }
   .hudBtn { background: rgba(23,24,28,.88); border: 1px solid var(--line); color: var(--text); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
   .hudBtn.active, .hudBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #lightWrap { position: absolute; bottom: 14px; left: 12px; display: flex; align-items: center; gap: 8px; background: rgba(23,24,28,.88); border: 1px solid var(--line); padding: 8px 12px; border-radius: 8px; z-index: 5; }
+  #lightWrap label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  #lightWrap input[type=range] { accent-color: var(--accent); }
   #explodeWrap { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: rgba(23,24,28,.88); border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; z-index: 5; }
   #explodeWrap label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
   #partCard { position: absolute; right: 12px; top: 12px; width: 300px; background: rgba(23,24,28,.94); border: 1px solid var(--line); border-radius: 8px; padding: 14px; font-size: 12.5px; display: none; z-index: 6; max-height: 70%; overflow: auto; }
@@ -93,6 +96,11 @@
       <button class="hudBtn" id="btnFront">Front</button>
       <button class="hudBtn" id="btnIso">Iso</button>
       <button class="hudBtn" id="btnTheme">Dark mode</button>
+    </div>
+    <div id="lightWrap">
+      <label>Light</label>
+      <input type="range" id="lightAz" min="0" max="360" value="140" title="direction" style="width:110px">
+      <input type="range" id="lightEl" min="5" max="85" value="28" title="height" style="width:90px">
     </div>
     <div id="explodeWrap" style="display:none">
       <label>Explode</label>

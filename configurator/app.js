@@ -78,8 +78,9 @@ function initViewer() {
 
   const amb = new THREE.HemisphereLight(0xf5efe6, 0x232428, 1.0);
   viewer.scene.add(amb);
-  const key = new THREE.DirectionalLight(0xfff2dd, 1.6); key.position.set(180, 260, 320); viewer.scene.add(key);
-  const fill = new THREE.DirectionalLight(0xcfd8e6, 0.6); fill.position.set(-220, 120, -180); viewer.scene.add(fill);
+  viewer.key = new THREE.DirectionalLight(0xfff2dd, 1.6); viewer.scene.add(viewer.key);
+  viewer.fill = new THREE.DirectionalLight(0xcfd8e6, 0.55); viewer.scene.add(viewer.fill);
+  updateLight();
 
   viewer.grid = new THREE.GridHelper(600, 30, 0x2a2d34, 0x1c1e23);
   viewer.grid.position.y = -0.05; viewer.scene.add(viewer.grid);
@@ -90,6 +91,15 @@ function initViewer() {
   window.addEventListener('resize', sizeViewer); sizeViewer();
   viewer.renderer.domElement.addEventListener('pointerdown', onPick);
   animate();
+}
+// key light from azimuth/elevation sliders — low default so faces read clearly
+function updateLight() {
+  const az = THREE.MathUtils.degToRad($$('#lightAz')?.valueAsNumber ?? 140);
+  const el = THREE.MathUtils.degToRad($$('#lightEl')?.valueAsNumber ?? 28);
+  const R = 500, cx = (cfg?.opening?.width ?? 142) / 2;
+  viewer.key.position.set(cx + R * Math.cos(el) * Math.sin(az), R * Math.sin(el), R * Math.cos(el) * Math.cos(az));
+  // fill opposes the key at a low angle
+  viewer.fill.position.set(cx - R * Math.cos(el) * Math.sin(az), R * 0.35, -R * Math.cos(el) * Math.cos(az));
 }
 function sizeViewer() {
   const el = $$('#viewer');
@@ -685,6 +695,8 @@ $$('#btnSwing').onclick = () => {
   $$('#btnSwing').textContent = doorsOpen ? 'Close doors' : 'Swing doors';
 };
 $$('#btnTheme').onclick = () => { lightMode = !lightMode; applyTheme(); };
+$$('#lightAz').oninput = updateLight;
+$$('#lightEl').oninput = updateLight;
 
 // ---------------- boot ----------------
 window.__app = { viewer, get result() { return result; }, get cfg() { return cfg; } };
