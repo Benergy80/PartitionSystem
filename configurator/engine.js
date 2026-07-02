@@ -185,7 +185,10 @@ export function generate(cfgIn) {
   if (headerMode) notes.push('Head condition: 2×5 header (pivot door with internal closers, leaves run to top — no head lites).');
   else if (cfg.door.type !== 'none' && cfg.door.hinge === 'pivot' && cfg.door.closers)
     notes.push('Head lites present above the door — 2×5 closer header omitted; verify pivot closer housing in door head rail.');
-  const vertLen = gridTop - S.clipPlateT;             // verticals bear on the 3/16" clip plate at the slab
+  // verticals bear on the 3/16" clip plate; in head-lite mode they run FULL height
+  // (through the top-channel band, which butts them bay-by-bay) up to the top clip plate.
+  const vertTop = headerMode ? gridTop : H - S.clipPlateT;
+  const vertLen = vertTop - S.clipPlateT;
   const vertY0 = S.clipPlateT;
 
   // ---- row layout (rail centerlines): field rows + optional head-lite band ----
