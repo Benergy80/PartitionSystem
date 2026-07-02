@@ -25,8 +25,9 @@ and the STP part files in `ELEVATOR ENTRY SHOP AND STP FILES/`. All dimensions i
 ## 2. Grid / assembly logic
 
 Elevation = rectangular clear opening (W × H) inside an optional portal (S11).
-Height equation (verified against source): **H = header 2" + vertical length + ¾" base
-stack** (102 = 2 + 99.25 + 0.75 in the lobby elevation — matches door leaf 99.13").
+Verticals bear directly on the 3/16" clip base plate at the slab — no visible gap at
+the ground. (Source verticals measured 99.25" in the 102" lobby opening; the remaining
+tolerance lives at the head engagement, not the base.)
 
 - **Head condition (rule)**: the 2×5 header (S1) is used ONLY when a pivot door with
   internal closers runs to the top of the grid (no upper windows) — it exists to house
@@ -86,8 +87,10 @@ Two door families in the source project:
 
 ## 4. Portal
 
-½" steel plate surround (head + 2 jambs), bronze finish, ¼" reveal beyond finished wall
-both sides. Depth = wall thickness + 2×¼" reveal (survey-driven; 13¼" in source project).
+½" steel plate LINING of the opening (head soffit + 2 jamb plates running the wall
+depth), bronze finish, ¼" reveal beyond finished wall both sides. Reads as a thin ½"
+edge band in elevation — it is NOT a header-like block. Depth = wall thickness +
+2×¼" reveal (survey-driven; 13¼" in source project).
 
 ## 5. Known conflicts / cautions found in source
 

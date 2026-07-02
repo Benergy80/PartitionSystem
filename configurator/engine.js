@@ -48,7 +48,6 @@ export const SYS = {
   mullLeg: 0.75, mullT: 0.125,
   glassT: 0.25,
   glassEdgeClear: 0.125,             // glass held back from steel each side
-  baseGap: 0.75,                     // clip plate 3/16 + leveling shim under verticals (102 = 2 + 99.25 + 0.75)
   clipPlateT: 0.1875,
   tapDrill: 0.137,                   // 8-32
   clearanceHole: 0.3125,             // 5/16 at shear connections (measured)
@@ -63,7 +62,7 @@ export const SYS = {
 
 export const DEFAULT_CONFIG = {
   opening: { width: 142.0, height: 102.0 },        // clear opening
-  portal: { enabled: true, depth: 13.25, faceWidth: 5.0, reveal: 0.25, plateT: 0.5 },
+  portal: { enabled: true, depth: 13.25, reveal: 0.25, plateT: 0.5 },
   bays: { count: 3, widths: null, doorBay: 1 },     // widths null => equal; doorBay index or -1
   rows: { count: 3, heights: null, topPanel: 'glass', headLite: true, headLiteHeight: 16 }, // field rows + head-lite band
   door: {
@@ -186,8 +185,8 @@ export function generate(cfgIn) {
   if (headerMode) notes.push('Head condition: 2×5 header (pivot door with internal closers, leaves run to top — no head lites).');
   else if (cfg.door.type !== 'none' && cfg.door.hinge === 'pivot' && cfg.door.closers)
     notes.push('Head lites present above the door — 2×5 closer header omitted; verify pivot closer housing in door head rail.');
-  const vertLen = gridTop - S.baseGap;                // 102 = 2 header + 99.25 vert + 0.75 base (measured, header mode)
-  const vertY0 = S.baseGap;
+  const vertLen = gridTop - S.clipPlateT;             // verticals bear on the 3/16" clip plate at the slab
+  const vertY0 = S.clipPlateT;
 
   // ---- row layout (rail centerlines): field rows + optional head-lite band ----
   const fieldRows = Math.max(1, cfg.rows.count | 0);
@@ -539,13 +538,14 @@ export function generate(cfgIn) {
 
   // ---- portal ----
   if (cfg.portal.enabled) {
-    const pd = cfg.portal.depth, fw = cfg.portal.faceWidth, pt = cfg.portal.plateT;
-    // head + 2 jambs: ½" plate channels wrapping the opening, depth through the wall (Z)
-    P.add({ kind: 'portal', profile: 'portalHead', name: `Portal head — ½" plate, ${inch(pd)} deep`, length: W + 2 * fw, dims: [W + 2 * fw, fw, pd], holes: [], extra: 'portal' },
-      { pos: [W / 2, H + fw / 2, 0], portal: 'head' });
+    const pd = cfg.portal.depth, pt = cfg.portal.plateT;
+    // ½" plate LINING of the opening: head soffit + jamb plates running the wall depth —
+    // reads as a thin edge band in elevation (CHL01 resubmittal), NOT a header-like block
+    P.add({ kind: 'portal', profile: 'portalHead', name: `Portal head lining — ½" plate, ${inch(pd)} deep`, length: W + 2 * pt, dims: [W + 2 * pt, pt, pd], holes: [], extra: 'portal' },
+      { pos: [W / 2, H + pt / 2, 0], portal: 'head' });
     for (const side of [0, 1]) {
-      P.add({ kind: 'portal', profile: 'portalJamb', name: `Portal jamb — ½" plate, ${inch(pd)} deep`, length: H, dims: [fw, H, pd], holes: [], extra: 'portal' },
-        { pos: [side ? W + fw / 2 : -fw / 2, H / 2, 0], portal: 'jamb' });
+      P.add({ kind: 'portal', profile: 'portalJamb', name: `Portal jamb lining — ½" plate, ${inch(pd)} deep`, length: H, dims: [pt, H, pd], holes: [], extra: 'portal' },
+        { pos: [side ? W + pt / 2 : -pt / 2, H / 2, 0], portal: 'jamb' });
     }
     if (pd < 4) conflicts.push({ level: 'warn', msg: `Portal depth ${inch(pd)} — verify against wall survey (source project: 13¼").` });
   }
@@ -593,7 +593,7 @@ export function generate(cfgIn) {
   const glassCost = glassArea * (RATES.glassPerSqFt[cfg.glass.type] ?? 30);
   lines.push({ item: `Glass ¼" ${cfg.glass.type} — ${glassArea.toFixed(1)} sqft (${panes.length} panes)`, cost: glassCost }); cost += glassCost;
   if (cfg.portal.enabled) {
-    const areaSqFt = ((W + 10) * cfg.portal.depth + 2 * H * cfg.portal.depth) / 144;
+    const areaSqFt = ((W + 1) * cfg.portal.depth + 2 * H * cfg.portal.depth) / 144;
     const c = areaSqFt * RATES.portalPlatePerSqFt;
     lines.push({ item: `Portal surround ½" plate — ${areaSqFt.toFixed(1)} sqft`, cost: c }); cost += c;
   }
