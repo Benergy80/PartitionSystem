@@ -28,6 +28,10 @@ No build step. Three.js is vendored in `vendor/` (import map maps `three`).
 - **Finishes tab** — steel finish swatches (source spec: oil-rubbed bronze), ¼" glass type.
 - **Quote + Files tab** — budget estimate breakdown, stock linear-ft totals with 10% waste
   and 24' stick counts, unique-part list, and exports.
+- **Isolated part view** — a scrollable parts list (step through every unique part) plus
+  a **Shop drawing** toggle: an orthographic multi-view (elevation, plan, to-scale end
+  section, iso, title block) with full dimensions and hole/slot distances from the outer
+  edges, exportable as SVG.
 - **Viewer** — light mode by default (dark toggle), orbit, assembled/exploded modes,
   hide-glass, animated door-swing simulation, click any part for its hole schedule and
   per-part GLB download.

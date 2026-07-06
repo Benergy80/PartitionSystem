@@ -29,6 +29,19 @@
   #explodeWrap { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: rgba(23,24,28,.88); border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; z-index: 5; }
   #explodeWrap label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
   #partCard { position: absolute; right: 12px; top: 12px; width: 300px; background: rgba(23,24,28,.94); border: 1px solid var(--line); border-radius: 8px; padding: 14px; font-size: 12.5px; display: none; z-index: 6; max-height: 70%; overflow: auto; }
+  #partsList { position: absolute; left: 12px; top: 56px; bottom: 14px; width: 214px; background: rgba(23,24,28,.95); border: 1px solid var(--line); border-radius: 8px; z-index: 9; display: none; overflow-y: auto; padding: 6px; }
+  #partsList h4 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 8px 8px 6px; position: sticky; top: 0; background: rgba(23,24,28,.98); }
+  #partsList .pl-item { padding: 6px 8px; border-radius: 5px; font-size: 11.5px; color: var(--dim); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  #partsList .pl-item:hover { background: var(--panel2); color: var(--text); }
+  #partsList .pl-item.active { background: rgba(201,163,106,.16); color: var(--accent); }
+  #partsList .pl-item .q { color: var(--dim); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+  #drawingOverlay { position: absolute; inset: 0 0 0 236px; background: #fbfaf7; z-index: 7; display: none; flex-direction: column; }
+  #drawingBar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #ddd8cd; background: #f2efe8; }
+  #drawingBar .hudBtn { background: #fff; color: #3a3128; border-color: #d5cfc2; }
+  #drawingBar .hudBtn:hover, #drawingBar .hudBtn.active { border-color: var(--accent); color: var(--accent2); }
+  #dwTitle { font-size: 12px; color: #6b6357; margin-left: 6px; }
+  #drawingScroll { flex: 1; overflow: auto; padding: 10px; }
+  #drawingScroll svg { width: 100%; height: auto; display: block; }
   #partCard h3 { font-size: 13px; color: var(--accent); margin-bottom: 6px; }
   #partCard table { width: 100%; border-collapse: collapse; margin-top: 6px; }
   #partCard td, #partCard th { border-top: 1px solid var(--line); padding: 3px 4px; text-align: left; font-size: 11.5px; color: var(--dim); }
@@ -107,6 +120,17 @@
       <input type="range" id="explodeAmt" min="0" max="100" value="40" style="width:220px">
     </div>
     <div id="partCard"></div>
+    <div id="partsList"></div>
+    <div id="drawingOverlay">
+      <div id="drawingBar">
+        <button class="hudBtn" id="dwPrev">◀</button>
+        <button class="hudBtn" id="dwNext">▶</button>
+        <button class="hudBtn" id="dw3D">3D view</button>
+        <button class="hudBtn" id="dwSvg">Download SVG</button>
+        <span id="dwTitle"></span>
+      </div>
+      <div id="drawingScroll"></div>
+    </div>
   </div>
   <div id="sidebar">
     <div id="tabs">

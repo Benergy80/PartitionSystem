@@ -6,6 +6,7 @@ import { OrbitControls } from './vendor/OrbitControls.js';
 import { GLTFExporter } from './vendor/GLTFExporter.js';
 import { generate, DEFAULT_CONFIG, RATES, STOCK, PLATE, SYS, inch } from './engine.js';
 import { buildPartMesh, poseObject, makeMaterials } from './geometry.js';
+import { partDrawingSVG } from './drawing.js';
 
 // ---------------- state ----------------
 let cfg = structuredClone(DEFAULT_CONFIG);
@@ -17,6 +18,7 @@ let selectedPartId = null;
 let lightMode = true;          // light viewer theme is the default
 let doorsOpen = false;
 let isolatedPartId = null;
+let drawingMode = false;
 
 const FINISHES = [
   { key: 'raw', name: 'Raw steel (waxed)', hex: 0x83858a },
@@ -202,6 +204,7 @@ function applyExplode() {
 function isolatePart(id) {
   const part = result.parts.find(p => p.id === id);
   if (!part) return;
+  const wasDrawing = drawingMode;
   exitIsolation(false);
   isolatedPartId = id;
   viewer.root.visible = false;
@@ -221,12 +224,47 @@ function isolatePart(id) {
   viewer.camera.near = Math.max(0.05, d / 100); viewer.camera.far = d * 50;
   viewer.camera.updateProjectionMatrix();
   showPartCard(part);
+  renderPartsList();
+  $$('#partsList').style.display = 'block';
+  if (wasDrawing) showDrawing(part);
 }
 function exitIsolation(reframe = true) {
   isolatedPartId = null;
+  drawingMode = false;
   if (viewer.isoGroup) { viewer.scene.remove(viewer.isoGroup); disposeDeep(viewer.isoGroup); viewer.isoGroup = null; }
   if (viewer.root) viewer.root.visible = true;
+  $$('#partsList').style.display = 'none';
+  $$('#drawingOverlay').style.display = 'none';
   if (reframe) { viewer.camera.near = 1; viewer.camera.updateProjectionMatrix(); frameCamera(true); }
+}
+
+// ---- scrollable parts list (visible during isolation) ----
+function renderPartsList() {
+  const el = $$('#partsList');
+  el.innerHTML = `<h4>Parts (${result.parts.length})</h4>` + result.parts.map(p =>
+    `<div class="pl-item ${p.id === isolatedPartId ? 'active' : ''}" data-pl="${p.id}">
+      <span>${p.id} · ${p.name}</span><span class="q">×${p.qty}</span></div>`).join('');
+  el.querySelectorAll('[data-pl]').forEach(row => {
+    row.onclick = () => { selectedPartId = row.dataset.pl; isolatePart(row.dataset.pl); };
+  });
+  const active = el.querySelector('.pl-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+// ---- orthographic drawing overlay ----
+function showDrawing(part) {
+  drawingMode = true;
+  $$('#drawingScroll').innerHTML = partDrawingSVG(part);
+  $$('#dwTitle').textContent = `${part.id} — ${part.name}  (×${part.qty})`;
+  $$('#drawingOverlay').style.display = 'flex';
+}
+function hideDrawing() {
+  drawingMode = false;
+  $$('#drawingOverlay').style.display = 'none';
+}
+function exportPartSVG(part) {
+  const svg = partDrawingSVG(part);
+  download(new Blob([svg], { type: 'image/svg+xml' }), `${part.id} ${part.name} drawing.svg`);
 }
 function stepPart(dir) {
   const ids = result.parts.map(p => p.id);
@@ -275,6 +313,7 @@ function showPartCard(part) {
       <button class="hudBtn" id="pcPrev">◀</button>
       <button class="hudBtn" id="pcNext">▶</button>
       <button class="hudBtn ${isolatedPartId ? 'active' : ''}" id="pcIso">${isolatedPartId ? 'Back to assembly' : 'Isolate part'}</button>
+      ${isolatedPartId ? `<button class="hudBtn" id="pcDraw">Shop drawing</button>` : ''}
       <span class="dl" data-dl="${part.id}" style="align-self:center">Download ${part.id}.glb</span>
     </div>`;
   el.style.display = 'block';
@@ -282,6 +321,8 @@ function showPartCard(part) {
   el.querySelector('#pcPrev').onclick = () => stepPart(-1);
   el.querySelector('#pcNext').onclick = () => stepPart(1);
   el.querySelector('#pcIso').onclick = () => { if (isolatedPartId) { exitIsolation(); showPartCard(part); } else { selectedPartId = part.id; isolatePart(part.id); } };
+  const drawBtn = el.querySelector('#pcDraw');
+  if (drawBtn) drawBtn.onclick = () => showDrawing(part);
 }
 
 // ---------------- regenerate ----------------
@@ -341,16 +382,10 @@ function layoutHTML() {
   </div>
   <div class="sec"><h2>Horizontal rows</h2>
     <div class="row"><label>Field rows</label><input type="number" id="rowCount" min="1" max="8" value="${r.count}"></div>
-    <div class="row"><label>Head lites</label><div class="pills">
-      <div class="pill ${r.headLite !== false ? 'active' : ''}" data-set="rows.headLite" data-val="true">Band across top</div>
-      <div class="pill ${r.headLite === false ? 'active' : ''}" data-set="rows.headLite" data-val="false">None</div></div></div>
-    ${r.headLite !== false ? `<div class="row"><label>Head lite height</label><input type="text" class="ftIn" id="hlH" value="${fmtFtIn(r.headLiteHeight || 16)}"></div>` : ''}
-    <div class="row"><label>Custom heights</label><input type="text" id="rowHeights" style="width:100%" placeholder="auto (equal)" value="${r.heights ? r.heights.map(h => fmtFtIn(h)).join(', ') : ''}"></div>
     <div class="row"><label>Head row infill</label><div class="pills">
       <div class="pill ${r.topPanel === 'glass' ? 'active' : ''}" data-set="rows.topPanel" data-val="glass">Glass</div>
       <div class="pill ${r.topPanel === 'metal' ? 'active' : ''}" data-set="rows.topPanel" data-val="metal">Metal panel</div></div></div>
-    <div class="note">The head-lite band runs continuously across sidelites and the door bay; the door head rail sits on the same line. Doors default to meet it — set an explicit leaf height to override.</div>
-    <div class="note">Mullion heights follow row heights — the ¾×¾ angle frames are cut per row. Rail sightline is 1" (1×2.5 tube + angle faces).</div>
+    <div class="note">Field rows subdivide below the door head; the head-lite band above auto-fills the opening and adds horizontals so no head panel is taller than a field panel — the grid stays congruent.</div>
   </div>
   <div class="sec"><h2>System check</h2>${conflictsHTML()}
     ${result.notes.map(n => `<div class="note">ℹ️ ${n}</div>`).join('')}
@@ -500,23 +535,16 @@ function wirePanel() {
   bindDim('ow', 'opening.width'); bindDim('oh', 'opening.height');
   bindDim('lw', v => { cfg.door.leafWidth = v; }); bindDim('lh', v => { cfg.door.height = v; });
   document.querySelectorAll('[data-doorh]').forEach(el => {
-    el.onclick = () => { cfg.door.height = +el.dataset.doorh; cfg.rows.heights = null; regen(); };
+    el.onclick = () => { cfg.door.height = +el.dataset.doorh; regen(); };
   });
   const on = (id, fn) => { const el = $$(`#${id}`); if (el) el.onchange = () => fn(el); };
   on('pd_t', el => { const v = parseFtIn(el.value); if (v != null) { cfg.portal.depth = v; regen(); } });
   on('bayCount', el => { cfg.bays.count = +el.value; cfg.bays.widths = null; regen(); });
-  on('rowCount', el => { cfg.rows.count = +el.value; cfg.rows.heights = null; regen(); });
-  on('hlH', el => { const v = parseFtIn(el.value); if (v != null) { cfg.rows.headLiteHeight = v; cfg.rows.heights = null; regen(); } });
+  on('rowCount', el => { cfg.rows.count = +el.value; regen(); });
   on('bayWidths', el => {
     const s = el.value.trim();
     cfg.bays.widths = s ? s.split(',').map(x => parseFtIn(x)).filter(v => v != null) : null;
     if (cfg.bays.widths && cfg.bays.widths.length !== cfg.bays.count) cfg.bays.count = cfg.bays.widths.length;
-    regen();
-  });
-  on('rowHeights', el => {
-    const s = el.value.trim();
-    cfg.rows.heights = s ? s.split(',').map(x => parseFtIn(x)).filter(v => v != null) : null;
-    if (cfg.rows.heights && cfg.rows.heights.length !== cfg.rows.count) cfg.rows.count = cfg.rows.heights.length;
     regen();
   });
   on('doorPull', el => { cfg.door.pull = el.value; regen(); });
@@ -714,6 +742,11 @@ $$('#btnSwing').onclick = () => {
 $$('#btnTheme').onclick = () => { lightMode = !lightMode; applyTheme(); };
 $$('#lightAz').oninput = updateLight;
 $$('#lightEl').oninput = updateLight;
+// drawing overlay controls
+$$('#dw3D').onclick = hideDrawing;
+$$('#dwPrev').onclick = () => stepPart(-1);
+$$('#dwNext').onclick = () => stepPart(1);
+$$('#dwSvg').onclick = () => { const p = result.parts.find(x => x.id === isolatedPartId); if (p) exportPartSVG(p); };
 
 // ---------------- boot ----------------
 window.__app = { viewer, get result() { return result; }, get cfg() { return cfg; } };

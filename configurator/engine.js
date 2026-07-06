@@ -65,7 +65,7 @@ export const DEFAULT_CONFIG = {
   opening: { width: 142.0, height: 102.0 },        // clear opening
   portal: { enabled: true, depth: 13.25, reveal: 0.25, plateT: 0.5 },
   bays: { count: 3, widths: null, doorSide: 'left' }, // widths null => equal; door auto-centers, doorSide breaks odd ties
-  rows: { count: 3, heights: null, topPanel: 'glass', headLite: true, headLiteHeight: 16 }, // field rows + head-lite band
+  rows: { count: 3, topPanel: 'glass', headLite: true }, // field-row count; head lite auto-sizes from the door
   door: {
     type: 'pair',                                   // 'none' | 'single' | 'pair'
     style: 'glass-grid',                            // 'glass-grid' | 'solid'
@@ -217,28 +217,21 @@ export function generate(cfgIn) {
     return arr;
   };
 
-  if (cfg.rows.heights && cfg.rows.heights.length) {
-    // explicit custom heights — honored verbatim (door aligns to the nearest rail below)
-    heights = [...cfg.rows.heights];
-    const sum = heights.reduce((a, b) => a + b, 0) + (heights.length - 1) * S.horizH;
-    if (Math.abs(sum - gridH) > 1 / 32) {
-      conflicts.push({ level: 'warn', msg: `Row heights total ${inch(sum)} vs grid height ${inch(gridH)} — remainder added to top row.` });
-      heights[heights.length - 1] += gridH - sum;
-    }
-  } else if (hasDoor) {
+  if (hasDoor) {
     // DOOR DRIVES THE GRID: a rail lands at the door head; field rows below, head lite above.
     if (doorHeadBottom + S.horizH > gridTop + 1e-6)
       conflicts.push({ level: 'error', msg: `Door height ${inch(leafH)} + clearances leaves no room below the ${headerMode ? 'header' : 'top channel'} — increase the opening height or reduce the door height.` });
     const aboveZone = gridTop - (doorHeadBottom + S.horizH);   // door-head-rail top -> grid top
+    heights = fillRows(doorHeadBottom - S.sillH, fieldRows);    // field rows below the door head
+    const fieldRowH = heights[0];                              // module height — keep the grid congruent
     if (aboveZone >= 6) {
-      // field rows below the door head, then an auto-subdivided head-lite band above
-      heights = fillRows(doorHeadBottom - S.sillH, fieldRows);
       headRailIdx = fieldRows - 1;                             // rail after the last field row = door head
-      const headRows = cfg.rows.headLite !== false ? Math.max(1, Math.ceil(aboveZone / S.maxRow)) : 1;
+      // CONGRUENCE: add horizontals so no head-lite panel is taller than a field panel.
+      const headRows = Math.max(1, Math.ceil(aboveZone / fieldRowH));
       heights.push(...fillRows(aboveZone, headRows));
     } else {
-      // door head is within 6" of the top — no separate head lite; the top channel /
-      // header serves as the door head, and field rows fill the whole grid.
+      // door head within 6" of the top — no head lite; the top channel/header is the head,
+      // and the field rows fill the whole grid.
       heights = fillRows(gridTop - S.sillH, fieldRows);
       headRailIdx = -1;
       headYOverride = gridTop;
@@ -246,21 +239,13 @@ export function generate(cfgIn) {
         notes.push(`Door head is within ${inch(aboveZone + S.horizH)} of the top — the leaf meets the top channel with no head lite. Lower the door height for a head-lite band.`);
     }
   } else {
-    // NO DOOR: even field rows + optional head-lite band (original behavior)
-    const useHeadLite = cfg.rows.headLite !== false;
-    if (useHeadLite) {
-      const hl = Math.max(10, Math.min(cfg.rows.headLiteHeight || 16, gridH - fieldRows * (S.minRow + S.horizH)));
-      heights = fillRows(gridH - hl - S.horizH, fieldRows);
-      heights.push(hl);
-    } else {
-      heights = fillRows(gridH, fieldRows);
-    }
+    // NO DOOR: even field rows across the whole grid
+    heights = fillRows(gridH, fieldRows);
   }
   const m = heights.length;
   // rows up to `bodyRows` are field (main-body) glass held to the strict minimum;
-  // rows above are the head-lite/transom band, where a short vision band is fine.
-  const bodyRows = hasDoor ? (headRailIdx < 0 ? m : headRailIdx + 1)
-                           : (cfg.rows.headLite !== false ? fieldRows : m);
+  // rows above are the head-lite/transom band, where a shorter vision band is fine.
+  const bodyRows = hasDoor && headRailIdx >= 0 ? headRailIdx + 1 : m;
   heights.forEach((rh, i) => {
     if (i < bodyRows) {
       if (rh < S.minRow) conflicts.push({ level: 'error', msg: `Field row ${i + 1} height ${inch(rh)} < ${S.minRow}" minimum — reduce field-row count or raise the door head.` });
