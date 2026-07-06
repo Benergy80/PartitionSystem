@@ -64,7 +64,7 @@ export const SYS = {
 export const DEFAULT_CONFIG = {
   opening: { width: 142.0, height: 102.0 },        // clear opening
   portal: { enabled: true, depth: 13.25, reveal: 0.25, plateT: 0.5 },
-  bays: { count: 3, widths: null, doorBay: 1 },     // widths null => equal; doorBay index or -1
+  bays: { count: 3, widths: null, doorSide: 'left' }, // widths null => equal; door auto-centers, doorSide breaks odd ties
   rows: { count: 3, heights: null, topPanel: 'glass', headLite: true, headLiteHeight: 16 }, // field rows + head-lite band
   door: {
     type: 'pair',                                   // 'none' | 'single' | 'pair'
@@ -128,7 +128,12 @@ export function generate(cfgIn) {
   // ---- bay layout ----
   const n = Math.max(1, cfg.bays.count | 0);
   let widths = cfg.bays.widths && cfg.bays.widths.length === n ? [...cfg.bays.widths] : null;
-  const doorBay = cfg.door.type === 'none' ? -1 : Math.min(cfg.bays.doorBay, n - 1);
+  // Door auto-centers among the sidelites. When the sidelite count is odd it can't
+  // split evenly — `doorSide` picks which side gets the extra bay (more glass there).
+  const sidelites = n - 1;
+  const sideliteSplitEven = sidelites % 2 === 0;
+  const leftSidelites = cfg.bays.doorSide === 'right' ? Math.floor(sidelites / 2) : Math.ceil(sidelites / 2);
+  const doorBay = cfg.door.type === 'none' ? -1 : leftSidelites; // door sits after the left sidelites
 
   // door bay width driven by leaves + gaps if doors on
   let doorBayW = 0;
@@ -660,7 +665,7 @@ export function generate(cfgIn) {
 
   return {
     cfg, parts, conflicts, notes, panes,
-    layout: { widths, heights, vx, railY, gridTop, vertLen, doorBay },
+    layout: { widths, heights, vx, railY, gridTop, vertLen, doorBay, sidelites, sideliteSplitEven, leftSidelites, rightSidelites: sidelites - leftSidelites },
     bom: { profiles, plateCounts, fasteners, glassArea, lines, total: cost },
     stats: {
       uniqueParts: parts.length,

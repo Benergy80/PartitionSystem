@@ -359,15 +359,19 @@ function layoutHTML() {
 
 function doorsHTML() {
   const d = cfg.door;
-  const bayOpts = Array.from({ length: cfg.bays.count }, (_, i) =>
-    `<option value="${i}" ${cfg.bays.doorBay === i ? 'selected' : ''}>Bay ${i + 1}</option>`).join('');
+  const L = result.layout;
+  const posRow = d.type === 'none' ? '' : (L.sideliteSplitEven
+    ? `<div class="row"><label>Door position</label><span class="note" style="margin:0">Centered — ${L.leftSidelites} sidelite${L.leftSidelites === 1 ? '' : 's'} each side</span></div>`
+    : `<div class="row"><label>Extra sidelite</label><div class="pills">
+        <div class="pill ${cfg.bays.doorSide !== 'right' ? 'active' : ''}" data-set="bays.doorSide" data-val="left">Left (${L.leftSidelites})</div>
+        <div class="pill ${cfg.bays.doorSide === 'right' ? 'active' : ''}" data-set="bays.doorSide" data-val="right">Right (${L.rightSidelites})</div></div></div>`);
   return `
   <div class="sec"><h2>Door configuration</h2>
     <div class="row"><label>Type</label><div class="pills">
       ${['none', 'single', 'pair'].map(t => `<div class="pill ${d.type === t ? 'active' : ''}" data-set="door.type" data-val="${t}">${t === 'none' ? 'No door' : t === 'single' ? 'Single' : 'Pair'}</div>`).join('')}
     </div></div>
     ${d.type !== 'none' ? `
-    <div class="row"><label>Door bay</label><select id="doorBay">${bayOpts}</select></div>
+    ${posRow}
     ${dimRow('Leaf width', 'lw', d.leafWidth || 36, 24, 48)}
     ${dimRow('Leaf height', 'lh', d._leafH || 84, 78, 120)}
     <div class="row"><label>Std. height</label><div class="pills">
@@ -484,7 +488,6 @@ function wirePanel() {
       let v = el.dataset.val;
       if (v === 'true') v = true; else if (v === 'false') v = false;
       setPath(el.dataset.set, v);
-      if (el.dataset.set === 'door.type' && v !== 'none' && cfg.bays.doorBay < 0) cfg.bays.doorBay = 0;
       regen();
     };
   });
@@ -516,7 +519,6 @@ function wirePanel() {
     if (cfg.rows.heights && cfg.rows.heights.length !== cfg.rows.count) cfg.rows.count = cfg.rows.heights.length;
     regen();
   });
-  on('doorBay', el => { cfg.bays.doorBay = +el.value; regen(); });
   on('doorPull', el => { cfg.door.pull = el.value; regen(); });
   on('doorLock', el => { cfg.door.lock = el.value; regen(); });
   on('hingeGap', el => { const v = parseFtIn(el.value); if (v != null) { cfg.door.hingeGap = v; regen(); } });
