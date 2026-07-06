@@ -54,6 +54,7 @@ export const SYS = {
   accessHole: 0.625,                 // ⅝ driver access (measured)
   anchorHole: 0.3125,
   screwsPerTongue: 2,
+  stdDoorHeight: 84,                 // default leaf height = 7'-0" (common commercial standard)
   minBay: 12, maxBay: 48,            // sane glass module limits
   minRow: 10, maxRow: 48,
   maxGlassArea: 24 * 144,            // sq in, ¼" plate comfort limit
@@ -168,58 +169,99 @@ export function generate(cfgIn) {
   const vx = [S.vertW / 2];
   for (let i = 0; i < n; i++) vx.push(vx[i] + S.vertW / 2 + widths[i] + S.vertW / 2);
 
+  // ---- door spec (FIXED height — independent of the opening height) ----
+  // The door leaf height is a room standard the user specifies (6'-8", 7'-0", 8'-0",
+  // …). It is NOT derived from the opening. A rail line is placed exactly at the door
+  // head, so changing the opening height only grows/shrinks the head-lite band above.
+  const hasDoor = doorBay >= 0;
+  const leaves = cfg.door.type === 'pair' ? 2 : 1;
+  const leafW = cfg.door.leafWidth || 36;
+  const leafH = hasDoor ? (cfg.door.height || S.stdDoorHeight) : 0;
+  const doorHeadBottom = hasDoor ? (cfg.door.floorClearance + leafH + cfg.door.headGap) : 0; // bottom edge of head rail
+
   // ---- head condition ----
-  // The 2×5 header exists ONLY to house internal closers for pivot doors when the
-  // leaves run to the top (no upper windows). Every other condition: head lites
-  // continue the grid up to a slim 1×2.5 top channel (source boardroom elevations).
+  // The 2×5 header exists ONLY to house internal closers for a pivot door specified to
+  // run to the top with no head lites. Otherwise the grid continues to a 1×2.5 top channel.
   let headerMode = false;
-  if (cfg.door.type !== 'none' && cfg.door.hinge === 'pivot' && cfg.door.closers && cfg.rows.headLite === false) {
-    const gridTopIfHeader = H - S.headerH;
-    const fillH = gridTopIfHeader - cfg.door.floorClearance - cfg.door.headGap;
-    const leafH = cfg.door.height || (fillH > 99.125 + 6 ? 99.125 : fillH);
-    const headY = cfg.door.floorClearance + leafH + cfg.door.headGap;
-    headerMode = headY >= gridTopIfHeader - 6;   // <6" left = no usable head lite
+  if (hasDoor && cfg.door.hinge === 'pivot' && cfg.door.closers && cfg.rows.headLite === false) {
+    headerMode = doorHeadBottom >= (H - S.headerH) - 3;
   }
   const topH = headerMode ? S.headerH : S.sillH;      // 2" header or 1" top channel
   const gridTop = H - topH;
-  if (headerMode) notes.push('Head condition: 2×5 header (pivot door with internal closers, leaves run to top — no head lites).');
-  else if (cfg.door.type !== 'none' && cfg.door.hinge === 'pivot' && cfg.door.closers)
-    notes.push('Head lites present above the door — 2×5 closer header omitted; verify pivot closer housing in door head rail.');
+  if (headerMode) notes.push('Head condition: 2×5 header (pivot door with internal closers, leaf runs to the top — no head lites).');
+  else if (hasDoor && cfg.door.hinge === 'pivot' && cfg.door.closers)
+    notes.push('Head lites present above the door — 2×5 closer header omitted; verify pivot closer housing in the door head rail.');
   // verticals bear on the 3/16" clip plate; in head-lite mode they run FULL height
   // (through the top-channel band, which butts them bay-by-bay) up to the top clip plate.
   const vertTop = headerMode ? gridTop : H - S.clipPlateT;
   const vertLen = vertTop - S.clipPlateT;
   const vertY0 = S.clipPlateT;
 
-  // ---- row layout (rail centerlines): field rows + optional head-lite band ----
+  // ---- row layout (rail centerlines) ----
+  const gridH = gridTop - S.sillH;    // glass zone: top of base sill -> top channel / header underside
   const fieldRows = Math.max(1, cfg.rows.count | 0);
-  const useHeadLite = cfg.rows.headLite !== false && !headerMode;
-  let heights = cfg.rows.heights && cfg.rows.heights.length ? [...cfg.rows.heights] : null;
-  const gridH = gridTop - S.sillH; // glass zone: top of base sill -> top channel / header underside
-  if (!heights) {
-    if (useHeadLite) {
-      const hl = Math.max(10, Math.min(cfg.rows.headLiteHeight || 16, gridH - fieldRows * (S.minRow + S.horizH)));
-      const net = gridH - hl - fieldRows * S.horizH;
-      const each = Math.floor((net / fieldRows) * 16) / 16;
-      heights = Array.from({ length: fieldRows }, () => each);
-      heights[fieldRows - 1] += net - each * fieldRows;   // remainder to top field row
-      heights.push(hl);                                   // head-lite band on top
-    } else {
-      const net = gridH - (fieldRows - 1) * S.horizH;
-      const each = Math.floor((net / fieldRows) * 16) / 16;
-      heights = Array.from({ length: fieldRows }, () => each);
-      heights[fieldRows - 1] += net - each * fieldRows;
-    }
-  } else {
+  let heights;
+  let headRailIdx = -1;               // index into railY that lands at the door head (-1 = door head is the grid top)
+  let headYOverride = null;           // door head snapped to grid top when there's no room for a head lite
+
+  const fillRows = (zone, count) => {  // `count` equal glass rows spanning `zone` (rows + intervening rails)
+    const net = zone - (count - 1) * S.horizH;
+    const each = Math.floor((net / count) * 16) / 16;
+    const arr = Array.from({ length: count }, () => each);
+    arr[count - 1] += net - each * count;             // rounding remainder to the last row
+    return arr;
+  };
+
+  if (cfg.rows.heights && cfg.rows.heights.length) {
+    // explicit custom heights — honored verbatim (door aligns to the nearest rail below)
+    heights = [...cfg.rows.heights];
     const sum = heights.reduce((a, b) => a + b, 0) + (heights.length - 1) * S.horizH;
     if (Math.abs(sum - gridH) > 1 / 32) {
       conflicts.push({ level: 'warn', msg: `Row heights total ${inch(sum)} vs grid height ${inch(gridH)} — remainder added to top row.` });
       heights[heights.length - 1] += gridH - sum;
     }
+  } else if (hasDoor) {
+    // DOOR DRIVES THE GRID: a rail lands at the door head; field rows below, head lite above.
+    if (doorHeadBottom + S.horizH > gridTop + 1e-6)
+      conflicts.push({ level: 'error', msg: `Door height ${inch(leafH)} + clearances leaves no room below the ${headerMode ? 'header' : 'top channel'} — increase the opening height or reduce the door height.` });
+    const aboveZone = gridTop - (doorHeadBottom + S.horizH);   // door-head-rail top -> grid top
+    if (aboveZone >= 6) {
+      // field rows below the door head, then an auto-subdivided head-lite band above
+      heights = fillRows(doorHeadBottom - S.sillH, fieldRows);
+      headRailIdx = fieldRows - 1;                             // rail after the last field row = door head
+      const headRows = cfg.rows.headLite !== false ? Math.max(1, Math.ceil(aboveZone / S.maxRow)) : 1;
+      heights.push(...fillRows(aboveZone, headRows));
+    } else {
+      // door head is within 6" of the top — no separate head lite; the top channel /
+      // header serves as the door head, and field rows fill the whole grid.
+      heights = fillRows(gridTop - S.sillH, fieldRows);
+      headRailIdx = -1;
+      headYOverride = gridTop;
+      if (aboveZone > 0.5 && cfg.rows.headLite !== false && !headerMode)
+        notes.push(`Door head is within ${inch(aboveZone + S.horizH)} of the top — the leaf meets the top channel with no head lite. Lower the door height for a head-lite band.`);
+    }
+  } else {
+    // NO DOOR: even field rows + optional head-lite band (original behavior)
+    const useHeadLite = cfg.rows.headLite !== false;
+    if (useHeadLite) {
+      const hl = Math.max(10, Math.min(cfg.rows.headLiteHeight || 16, gridH - fieldRows * (S.minRow + S.horizH)));
+      heights = fillRows(gridH - hl - S.horizH, fieldRows);
+      heights.push(hl);
+    } else {
+      heights = fillRows(gridH, fieldRows);
+    }
   }
   const m = heights.length;
+  // rows up to `bodyRows` are field (main-body) glass held to the strict minimum;
+  // rows above are the head-lite/transom band, where a short vision band is fine.
+  const bodyRows = hasDoor ? (headRailIdx < 0 ? m : headRailIdx + 1)
+                           : (cfg.rows.headLite !== false ? fieldRows : m);
   heights.forEach((rh, i) => {
-    if (rh < S.minRow) conflicts.push({ level: 'error', msg: `Row ${i + 1} height ${inch(rh)} < ${S.minRow}" minimum.` });
+    if (i < bodyRows) {
+      if (rh < S.minRow) conflicts.push({ level: 'error', msg: `Field row ${i + 1} height ${inch(rh)} < ${S.minRow}" minimum — reduce field-row count or raise the door head.` });
+    } else if (rh < 4) {
+      conflicts.push({ level: 'warn', msg: `Head lite ${inch(rh)} is very short — a taller opening or shorter door gives a more standard transom.` });
+    }
     if (rh > S.maxRow) conflicts.push({ level: 'warn', msg: `Row ${i + 1} height ${inch(rh)} exceeds ${S.maxRow}" — check glass deflection.` });
   });
   // rail centerlines y
@@ -227,32 +269,14 @@ export function generate(cfgIn) {
   { let y = S.sillH; for (let i = 0; i < m - 1; i++) { y += heights[i] + S.horizH / 2; railY.push(y); y += S.horizH / 2; } }
 
   // ---- door checks ----
-  if (doorBay >= 0) {
-    let fillH;
-    if (useHeadLite && railY.length) {
-      // leaf head meets the head-lite rail line — mullion line continues across the elevation
-      fillH = (railY[railY.length - 1] - S.horizH / 2) - cfg.door.floorClearance - cfg.door.headGap;
-    } else {
-      const f = gridTop - cfg.door.floorClearance - cfg.door.headGap;
-      fillH = f > 99.125 + 6 ? 99.125 : f;
-    }
-    const leafH = cfg.door.height || fillH;
-    const leaves = cfg.door.type === 'pair' ? 2 : 1;
-    const leafW = cfg.door.leafWidth || 36;
+  if (hasDoor) {
     if (leafW < 24) conflicts.push({ level: 'error', msg: `Door leaf ${inch(leafW)} < 24" — not code-compliant for egress.` });
     if (leafW > 48) conflicts.push({ level: 'warn', msg: `Door leaf ${inch(leafW)} > 48" — heavy leaf; use pivot hinge + reinforced jamb.` });
-    if (leafH + cfg.door.floorClearance + cfg.door.headGap > gridTop + 1e-6)
-      conflicts.push({ level: 'error', msg: `Door leaf height ${inch(leafH)} + clearances exceeds grid height ${inch(gridTop)}.` });
     if (cfg.door.hinge === 'butt' && leafH * leafW / 144 > 24)
       conflicts.push({ level: 'warn', msg: `Leaf area ${(leafW * leafH / 144).toFixed(1)} sqft on butt hinges — recommend continuous hinge or pivot.` });
     cfg.door._leafH = leafH; cfg.door._leaves = leaves; cfg.door._leafW = leafW;
-    // transom above door if grid rails cross the door bay
-    const doorHead = cfg.door.floorClearance + leafH + cfg.door.headGap;
-    railY.forEach((ry, i) => {
-      if (ry > cfg.door.floorClearance && ry < doorHead - 2)
-        notes.push(`Rail line ${i + 1} at ${ftIn(ry)} passes across the door bay — a transom rail is generated only above the leaf head (${ftIn(doorHead)}).`);
-    });
-    cfg.door._headY = doorHead;
+    cfg.door._headY = headYOverride != null ? headYOverride : doorHeadBottom;  // bottom of the head rail
+    cfg.door._headRailIdx = headRailIdx;
   }
 
   if (W > S.headerStockMax) conflicts.push({ level: 'warn', msg: `Header span ${ftIn(W)} exceeds ${RATES.stockLengthFt}' stock — a field splice (Type A + Type B jamb-fix pattern) is generated.` });
@@ -440,12 +464,16 @@ export function generate(cfgIn) {
 
   // ---- glass + mullion frames per pane ----
   let glassArea = 0; const panes = [];
+  // door bay: skip rows at/below the door head (the leaf occupies them); the head-lite
+  // rows above the door head are glazed like any sidelite so the grid reads continuous.
+  const doorSkipUpTo = cfg.door._headRailIdx < 0 ? m : cfg.door._headRailIdx;
   for (let b = 0; b < n; b++) {
-    if (b === doorBay) continue;
+    const isDoorBay = b === doorBay;
     const span = widths[b], x0 = vx[b] + S.vertW / 2;
     let y = S.sillH;
     for (let r = 0; r < m; r++) {
       const rh = heights[r];
+      if (isDoorBay && r <= doorSkipUpTo) { y += rh + (r < m - 1 ? S.horizH : 0); continue; }
       const isMetal = cfg.rows.topPanel === 'metal' && r === m - 1;
       const gw = span - 2 * S.glassEdgeClear;
       const gh = rh - 2 * S.glassEdgeClear;
@@ -547,42 +575,9 @@ export function generate(cfgIn) {
       }
       doorParts.push({ leaf, hinges: d.hinge === 'continuous' ? 1 : Math.max(3, Math.ceil(d._leafH / 30)) });
     }
-    // transom above door head if space
-    const tSpace = gridTop - d._headY;
-    if (tSpace > 6) {
-      const gw = span - 2 * S.glassEdgeClear, gh = tSpace - S.horizH - 2 * S.glassEdgeClear;
-      if (gh > 3) {
-        glassArea += sqft(gw, gh);
-        panes.push({ bay: doorBay + 1, row: 'transom', w: gw, h: gh });
-        const isMetalHL = cfg.rows.topPanel === 'metal';
-        P.add({ kind: isMetalHL ? 'panel' : 'glass', profile: isMetalHL ? 'metal' : 'glass',
-          name: isMetalHL ? 'Metal infill panel' : `Glass pane ¼" (${cfg.glass.type})`,
-          length: gw, dims: [gw, gh, isMetalHL ? 0.125 : S.glassT], holes: [] },
-          { pos: [x0 + span / 2, d._headY + S.horizH + gh / 2 + S.glassEdgeClear, 0], rot: [0, 0, 0] });
-        // mullion picture frame for the transom, both faces (matches field panes)
-        const ty = d._headY + S.horizH;                    // frame zone bottom
-        const th = tSpace - S.horizH;                      // frame zone height
-        for (const face of [1, -1]) {
-          P.add({ kind: 'angle', profile: 'mullion', name: 'Mullion angle — horizontal (mitered)', length: span, miter: 45, holes: [] },
-            { pos: [x0 + span / 2, ty + S.mullLeg / 2, face * (S.glassT / 2 + S.mullT / 2)], rot: [0, 0, 0], mullion: 'h-bottom', face });
-          P.add({ kind: 'angle', profile: 'mullion', name: 'Mullion angle — horizontal (mitered)', length: span, miter: 45, holes: [] },
-            { pos: [x0 + span / 2, ty + th - S.mullLeg / 2, face * (S.glassT / 2 + S.mullT / 2)], rot: [0, 0, 180], mullion: 'h-top', face });
-          P.add({ kind: 'angle', profile: 'mullion', name: 'Mullion angle — vertical (mitered)', length: th, miter: 45, holes: [] },
-            { pos: [x0 + S.mullLeg / 2, ty + th / 2, face * (S.glassT / 2 + S.mullT / 2)], rot: [0, 0, 90], mullion: 'v-left', face });
-          P.add({ kind: 'angle', profile: 'mullion', name: 'Mullion angle — vertical (mitered)', length: th, miter: 45, holes: [] },
-            { pos: [x0 + span - S.mullLeg / 2, ty + th / 2, face * (S.glassT / 2 + S.mullT / 2)], rot: [0, 0, -90], mullion: 'v-right', face });
-        }
-      }
-      // door head rail
-      const holes = [];
-      [0.5, 1.5, span - 1.5, span - 0.5].forEach(hx => {
-        holes.push({ face: 'top', x: hx, y: S.horizD / 2, d: 0.177, note: '8-32 clearance' });
-        holes.push({ face: 'bottom', x: hx, y: S.horizD / 2, d: S.accessHole, note: 'access' });
-      });
-      P.add({ kind: 'tube', profile: 'horizontal', name: 'Door head rail', length: span, dims: [S.horizD, S.horizH], holes },
-        { pos: [x0 + span / 2, d._headY + S.horizH / 2, 0], rot: [0, 0, 0], horizontal: true });
-      fasteners.screw832 += 4; jointCount += 2;
-    }
+    // The door head rail and the head-lite glass above it are generated by the main
+    // horizontal-rail and glass loops (the door head lands exactly on rail line
+    // #${d._headRailIdx + 1}), so nothing extra is emitted here.
   }
 
   // ---- portal ----

@@ -369,7 +369,11 @@ function doorsHTML() {
     ${d.type !== 'none' ? `
     <div class="row"><label>Door bay</label><select id="doorBay">${bayOpts}</select></div>
     ${dimRow('Leaf width', 'lw', d.leafWidth || 36, 24, 48)}
-    ${dimRow('Leaf height', 'lh', d._leafH || 96, 78, 120)}
+    ${dimRow('Leaf height', 'lh', d._leafH || 84, 78, 120)}
+    <div class="row"><label>Std. height</label><div class="pills">
+      ${[[80, "6'-8\""], [84, "7'-0\""], [96, "8'-0\""]].map(([h, lbl]) =>
+        `<div class="pill ${Math.abs((d._leafH || 84) - h) < 0.1 ? 'active' : ''}" data-doorh="${h}">${lbl}</div>`).join('')}</div></div>
+    <div class="note">Door height is a fixed room standard — it drives a rail line at the door head, so changing the <b>opening height</b> only grows or shrinks the head-lite band above, never the door.</div>
     <div class="row"><label>Leaf style</label><div class="pills">
       <div class="pill ${d.style === 'glass-grid' ? 'active' : ''}" data-set="door.style" data-val="glass-grid">Glass grid</div>
       <div class="pill ${d.style === 'solid' ? 'active' : ''}" data-set="door.style" data-val="solid">Solid (wood veneer)</div></div></div>
@@ -492,6 +496,9 @@ function wirePanel() {
   const setByPath = (p, v) => { if (typeof p === 'function') p(v); else setPath(p, v); };
   bindDim('ow', 'opening.width'); bindDim('oh', 'opening.height');
   bindDim('lw', v => { cfg.door.leafWidth = v; }); bindDim('lh', v => { cfg.door.height = v; });
+  document.querySelectorAll('[data-doorh]').forEach(el => {
+    el.onclick = () => { cfg.door.height = +el.dataset.doorh; cfg.rows.heights = null; regen(); };
+  });
   const on = (id, fn) => { const el = $$(`#${id}`); if (el) el.onchange = () => fn(el); };
   on('pd_t', el => { const v = parseFtIn(el.value); if (v != null) { cfg.portal.depth = v; regen(); } });
   on('bayCount', el => { cfg.bays.count = +el.value; cfg.bays.widths = null; regen(); });

@@ -64,10 +64,20 @@ tolerance lives at the head engagement, not the base.)
 
 ## 3. Doors
 
-**Head lites:** a distinct shorter glass band (default 1'-4") runs continuously across the
-top of the whole elevation — sidelites AND door bay — with the transom rail unbroken at
-the door head. Doors default to meet that rail line. Head-lite row may be metal panel
-(source lobby spandrels). Disabling head lites is what enables the 2×5 closer-header case.
+**Door height DRIVES the grid (fixed, independent of the opening):** the door leaf height
+is a room standard the user specifies (default 7'-0"; presets 6'-8" / 7'-0" / 8'-0"). It is
+NOT derived from the opening height. A horizontal rail is placed exactly at the door head
+(`floorClearance + leafH + headGap`); the field rows below it are subdivided into
+`rows.count` equal rows, and everything above is a head-lite band. Consequently, changing
+the **opening height** only grows or shrinks the head-lite band above the door — it never
+touches the door or the field rows below it. If the head-lite zone would exceed 4' it
+auto-subdivides into multiple rows; if the door reaches within 6" of the top, the top
+channel/header serves as the door head (no separate head lite).
+
+**Head lites:** the band above the door head runs continuously across the whole elevation —
+sidelites AND door bay — with the door-head rail unbroken. The head-lite row may be metal
+panel (source lobby spandrels). Turning head lites off with a pivot+closer door specified
+to the top is what enables the 2×5 closer-header case.
 
 **Cohesion rule:** door leaf mid-rails are generated on the partition rail centerlines —
 mullion lines always carry across leaves, sidelites, and transoms (per CHL01/CHL10
